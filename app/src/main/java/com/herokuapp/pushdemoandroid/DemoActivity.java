@@ -18,9 +18,13 @@ package com.herokuapp.pushdemoandroid;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
+import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
+import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
+import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -28,9 +32,23 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -38,35 +56,41 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class DemoActivity extends Activity {
 
-    public static final String EXTRA_MESSAGE = "message";
-    public static final String PROPERTY_REG_ID = "registration_id";
-    private static final String PROPERTY_APP_VERSION = "appVersion";
-    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
-
-    /**
-     * Substitute you own sender ID here. This is the project number you got
-     * from the API Console, as described in "Getting Started."
-     */
-    String SENDER_ID = "388507868439";
-
-    /**
-     * Tag used on log messages.
-     */
-    static final String TAG = "GCM Demo";
-
     TextView mDisplay;
     GoogleCloudMessaging gcm;
     AtomicInteger msgId = new AtomicInteger();
     Context context;
 
     String regid;
+    // alert dialog manager
+    AlertDialogManager alert = new AlertDialogManager();
+
+    // Internet detector
+    ConnectionDetector cd;
+
+    // UI elements
+    EditText txtName;
+    EditText txtPassword;
+    EditText txtEmail;
+
+    // Register button
+    Button btnRegister;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.main);
-        mDisplay = (TextView) findViewById(R.id.display);
+        setContentView(R.layout.activity_register);
+        // Check if Internet present
+        cd = new ConnectionDetector(getApplicationContext());
+        if (!cd.isConnectingToInternet()) {
+            // Internet Connection is not present
+            alert.showAlertDialog(DemoActivity.this,
+                    "Internet Connection Error",
+                    "Please connect to working Internet connection", false);
+            // stop executing code by return
+            return;
+        }
 
         context = getApplicationContext();
 
@@ -74,14 +98,89 @@ public class DemoActivity extends Activity {
         if (checkPlayServices()) {
             gcm = GoogleCloudMessaging.getInstance(this);
             regid = getRegistrationId(context);
-            Log.i(TAG,"regid = " + regid);
+            Log.i(CommonUtilities.TAG,"regid = " + regid);
 
             if (regid.isEmpty()) {
                 registerInBackground();
+            } else {
+                Intent i = new Intent(getApplicationContext(), MainActivity.class);
+
+                // Registering user on our server
+                // Sending registraiton details to MainActivity
+//                i.putExtra("name", name);
+//                i.putExtra("email", email);
+                startActivity(i);
+                finish();
             }
         } else {
-            Log.i(TAG, "No valid Google Play Services APK found.");
+            Log.i(CommonUtilities.TAG, "No valid Google Play Services APK found.");
         }
+
+        txtName = (EditText) findViewById(R.id.txtName);
+        txtEmail = (EditText) findViewById(R.id.txtEmail);
+        btnRegister = (Button) findViewById(R.id.btnRegister);
+        txtPassword = (EditText) findViewById(R.id.txtPassword);
+
+		/*
+		 * Click event on Register button
+		 * */
+        btnRegister.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                // Read EditText dat
+                String name = txtName.getText().toString();
+                String email = txtEmail.getText().toString();
+                String password = txtPassword.getText().toString();
+
+                // Check if user filled the form
+                if(name.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
+                    // Register to server
+                    HttpClient httpClient = new DefaultHttpClient();
+                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL);
+                    List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
+                    nameValuePair.add(new BasicNameValuePair("username", name));
+                    nameValuePair.add(new BasicNameValuePair("password", password));
+                    nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
+                    nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
+                    nameValuePair.add(new BasicNameValuePair("mail", email));
+
+                    //Encoding POST data
+                    try {
+                        httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
+
+                    } catch (UnsupportedEncodingException e)
+                    {
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        HttpResponse response = httpClient.execute(httpPost);
+                        // write response to log
+                        Log.d("Http Post Response:", response.toString());
+                    } catch (ClientProtocolException e) {
+                        // Log exception
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        // Log exception
+                        e.printStackTrace();
+                    }
+
+                    Intent i = new Intent(getApplicationContext(), MainActivity.class);
+
+                    // Registering user on our server
+                    // Sending registraiton details to MainActivity
+                    i.putExtra("name", name);
+                    i.putExtra("email", email);
+                    startActivity(i);
+                    finish();
+                }else{
+                    // user doen't filled that data
+                    // ask him to fill the form
+                    alert.showAlertDialog(DemoActivity.this, "Registration Error!", "Please enter your details", false);
+                }
+            }
+        });
     }
 
     @Override
@@ -101,9 +200,9 @@ public class DemoActivity extends Activity {
         if (resultCode != ConnectionResult.SUCCESS) {
             if (GooglePlayServicesUtil.isUserRecoverableError(resultCode)) {
                 GooglePlayServicesUtil.getErrorDialog(resultCode, this,
-                        PLAY_SERVICES_RESOLUTION_REQUEST).show();
+                        CommonUtilities.PLAY_SERVICES_RESOLUTION_REQUEST).show();
             } else {
-                Log.i(TAG, "This device is not supported.");
+                Log.i(CommonUtilities.TAG, "This device is not supported.");
                 finish();
             }
             return false;
@@ -121,10 +220,10 @@ public class DemoActivity extends Activity {
     private void storeRegistrationId(Context context, String regId) {
         final SharedPreferences prefs = getGcmPreferences(context);
         int appVersion = getAppVersion(context);
-        Log.i(TAG, "Saving regId on app version " + appVersion);
+        Log.i(CommonUtilities.TAG, "Saving regId on app version " + appVersion);
         SharedPreferences.Editor editor = prefs.edit();
-        editor.putString(PROPERTY_REG_ID, regId);
-        editor.putInt(PROPERTY_APP_VERSION, appVersion);
+        editor.putString(CommonUtilities.PROPERTY_REG_ID, regId);
+        editor.putInt(CommonUtilities.PROPERTY_APP_VERSION, appVersion);
         editor.commit();
     }
 
@@ -138,18 +237,18 @@ public class DemoActivity extends Activity {
      */
     private String getRegistrationId(Context context) {
         final SharedPreferences prefs = getGcmPreferences(context);
-        String registrationId = prefs.getString(PROPERTY_REG_ID, "");
+        String registrationId = prefs.getString(CommonUtilities.PROPERTY_REG_ID, "");
         if (registrationId.isEmpty()) {
-            Log.i(TAG, "Registration not found.");
+            Log.i(CommonUtilities.TAG, "Registration not found.");
             return "";
         }
         // Check if app was updated; if so, it must clear the registration ID
         // since the existing regID is not guaranteed to work with the new
         // app version.
-        int registeredVersion = prefs.getInt(PROPERTY_APP_VERSION, Integer.MIN_VALUE);
+        int registeredVersion = prefs.getInt(CommonUtilities.PROPERTY_APP_VERSION, Integer.MIN_VALUE);
         int currentVersion = getAppVersion(context);
         if (registeredVersion != currentVersion) {
-            Log.i(TAG, "App version changed.");
+            Log.i(CommonUtilities.TAG, "App version changed.");
             return "";
         }
         return registrationId;
@@ -170,7 +269,7 @@ public class DemoActivity extends Activity {
                     if (gcm == null) {
                         gcm = GoogleCloudMessaging.getInstance(context);
                     }
-                    regid = gcm.register(SENDER_ID);
+                    regid = gcm.register(CommonUtilities.SENDER_ID);
                     msg = "Device registered, registration ID=" + regid;
 
                     // You should send the registration ID to your server over HTTP, so it
@@ -212,7 +311,7 @@ public class DemoActivity extends Activity {
                         data.putString("my_message", "Hello World");
                         data.putString("my_action", "com.google.android.gcm.demo.app.ECHO_NOW");
                         String id = Integer.toString(msgId.incrementAndGet());
-                        gcm.send(SENDER_ID + "@gcm.googleapis.com", id, data);
+                        gcm.send(CommonUtilities.SENDER_ID + "@gcm.googleapis.com", id, data);
                         msg = "Sent message";
                     } catch (IOException ex) {
                         msg = "Error :" + ex.getMessage();

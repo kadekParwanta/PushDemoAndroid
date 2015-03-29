@@ -20,9 +20,15 @@
      NOTE: the permission *must* be called PACKAGE.permission.C2D_MESSAGE,
            where PACKAGE is the application's package name.
     -->
-    <permission android:name="com.google.android.gcm.demo.app.permission.C2D_MESSAGE"
+    <permission android:name="com.herokuapp.pushdemoandroid.permission.C2D_MESSAGE"
         android:protectionLevel="signature" />
-    <uses-permission android:name="com.google.android.gcm.demo.app.permission.C2D_MESSAGE" />
+    <uses-permission android:name="com.herokuapp.pushdemoandroid.permission.C2D_MESSAGE" />
+
+    <!-- Network State Permissions to detect Internet status -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Permission to vibrate -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- This app has permission to register and receive data message. -->
     <uses-permission
@@ -46,6 +52,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/app_name" >
+        </activity>
+
         <!--
           WakefulBroadcastReceiver that will receive intents from GCM
           services and hand them to the custom IntentService.
@@ -59,7 +71,7 @@
             <intent-filter>
                 <!-- Receives the actual messages. -->
                 <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-                <category android:name="com.google.android.gcm.demo.app" />
+                <category android:name="com.herokuapp.pushdemoandroid" />
             </intent-filter>
         </receiver>
         <service android:name=".GcmIntentService" />
