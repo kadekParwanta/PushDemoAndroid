@@ -75,6 +75,7 @@ public class DemoActivity extends Activity {
 
     // Register button
     Button btnRegister;
+    AsyncTask<Void,Void,Void> mRegisterTask;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -128,57 +129,7 @@ public class DemoActivity extends Activity {
 
             @Override
             public void onClick(View arg0) {
-                // Read EditText dat
-                String name = txtName.getText().toString();
-                String email = txtEmail.getText().toString();
-                String password = txtPassword.getText().toString();
-
-                // Check if user filled the form
-                if(name.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
-                    // Register to server
-                    HttpClient httpClient = new DefaultHttpClient();
-                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL);
-                    List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
-                    nameValuePair.add(new BasicNameValuePair("username", name));
-                    nameValuePair.add(new BasicNameValuePair("password", password));
-                    nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
-                    nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
-                    nameValuePair.add(new BasicNameValuePair("mail", email));
-
-                    //Encoding POST data
-                    try {
-                        httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
-
-                    } catch (UnsupportedEncodingException e)
-                    {
-                        e.printStackTrace();
-                    }
-
-                    try {
-                        HttpResponse response = httpClient.execute(httpPost);
-                        // write response to log
-                        Log.d("Http Post Response:", response.toString());
-                    } catch (ClientProtocolException e) {
-                        // Log exception
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        // Log exception
-                        e.printStackTrace();
-                    }
-
-                    Intent i = new Intent(getApplicationContext(), MainActivity.class);
-
-                    // Registering user on our server
-                    // Sending registraiton details to MainActivity
-                    i.putExtra("name", name);
-                    i.putExtra("email", email);
-                    startActivity(i);
-                    finish();
-                }else{
-                    // user doen't filled that data
-                    // ask him to fill the form
-                    alert.showAlertDialog(DemoActivity.this, "Registration Error!", "Please enter your details", false);
-                }
+                sendPostRequest();
             }
         });
     }
@@ -364,5 +315,78 @@ public class DemoActivity extends Activity {
      */
     private void sendRegistrationIdToBackend() {
       // Your implementation here.
+    }
+
+    private void sendPostRequest() {
+        // Try to register again, but not in the UI thread.
+        // It's also necessary to cancel the thread onDestroy(),
+        // hence the use of AsyncTask instead of a raw thread.
+        final Context context = this;
+        mRegisterTask = new AsyncTask<Void, Void, Void>() {
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                // Register on our server
+                // On server creates a new user
+                // Read EditText dat
+                String name = txtName.getText().toString();
+                String email = txtEmail.getText().toString();
+                String password = txtPassword.getText().toString();
+
+                // Check if user filled the form
+                if(name.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
+                    // Register to server
+                    HttpClient httpClient = new DefaultHttpClient();
+                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL);
+                    List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
+                    nameValuePair.add(new BasicNameValuePair("username", name));
+                    nameValuePair.add(new BasicNameValuePair("password", password));
+                    nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
+                    nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
+                    nameValuePair.add(new BasicNameValuePair("mail", email));
+
+                    //Encoding POST data
+                    try {
+                        httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
+
+                    } catch (UnsupportedEncodingException e)
+                    {
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        HttpResponse response = httpClient.execute(httpPost);
+                        // write response to log
+                        Log.d("Http Post Response:", response.toString());
+                    } catch (ClientProtocolException e) {
+                        // Log exception
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        // Log exception
+                        e.printStackTrace();
+                    }
+
+                    Intent i = new Intent(getApplicationContext(), MainActivity.class);
+
+                    // Registering user on our server
+                    // Sending registraiton details to MainActivity
+                    i.putExtra("name", name);
+                    i.putExtra("email", email);
+                    startActivity(i);
+                    finish();
+                }else{
+                    // user doen't filled that data
+                    // ask him to fill the form
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void result) {
+                mRegisterTask = null;
+            }
+
+        };
+        mRegisterTask.execute(null, null, null);
     }
 }

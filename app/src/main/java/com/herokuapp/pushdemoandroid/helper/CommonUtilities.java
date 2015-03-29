@@ -7,6 +7,7 @@ public final class CommonUtilities {
 	
 	// give your server registration url here
     public static final String SERVER_URL = "http://pushdemo.herokuapp.com/register?";
+    public static final String SERVER_PUSH_URL = "http://pushdemo.herokuapp.com/push_to_user?";
 
     // Google project id
     public static final String SENDER_ID = "388507868439";
