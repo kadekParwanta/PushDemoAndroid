@@ -44,6 +44,10 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -75,13 +79,22 @@ public class DemoActivity extends Activity {
 
     // Register button
     Button btnRegister;
-    AsyncTask<Void,Void,Void> mRegisterTask;
+    AsyncTask<Void,Void,HttpResponse> mRegisterTask;
+    private String username;
+    private String password;
+    private String email;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_register);
+        txtName = (EditText) findViewById(R.id.txtName);
+        txtEmail = (EditText) findViewById(R.id.txtEmail);
+        btnRegister = (Button) findViewById(R.id.btnRegister);
+        txtPassword = (EditText) findViewById(R.id.txtPassword);
+        mDisplay = (TextView) findViewById(R.id.tvDisplay);
+
         // Check if Internet present
         cd = new ConnectionDetector(getApplicationContext());
         if (!cd.isConnectingToInternet()) {
@@ -99,16 +112,17 @@ public class DemoActivity extends Activity {
         if (checkPlayServices()) {
             gcm = GoogleCloudMessaging.getInstance(this);
             regid = getRegistrationId(context);
-            Log.i(CommonUtilities.TAG,"regid = " + regid);
+            String username = getUsername(context);
+            Log.i(CommonUtilities.TAG,"regid = " + regid + " username= " + username);
 
             if (regid.isEmpty()) {
                 registerInBackground();
-            } else {
+            } else if (!username.isEmpty()) {
                 Intent i = new Intent(getApplicationContext(), MainActivity.class);
 
                 // Registering user on our server
                 // Sending registraiton details to MainActivity
-//                i.putExtra("name", name);
+                i.putExtra("name", username);
 //                i.putExtra("email", email);
                 startActivity(i);
                 finish();
@@ -117,10 +131,7 @@ public class DemoActivity extends Activity {
             Log.i(CommonUtilities.TAG, "No valid Google Play Services APK found.");
         }
 
-        txtName = (EditText) findViewById(R.id.txtName);
-        txtEmail = (EditText) findViewById(R.id.txtEmail);
-        btnRegister = (Button) findViewById(R.id.btnRegister);
-        txtPassword = (EditText) findViewById(R.id.txtPassword);
+
 
 		/*
 		 * Click event on Register button
@@ -205,6 +216,38 @@ public class DemoActivity extends Activity {
         return registrationId;
     }
 
+
+
+    private void storeCrefentials(Context context, String username, String password, String email) {
+        final SharedPreferences prefs = getGcmPreferences(context);
+        int appVersion = getAppVersion(context);
+        Log.i(CommonUtilities.TAG, "Saving regId on app version " + appVersion);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(CommonUtilities.PROPERTY_REG_USERNAME, username);
+        editor.putString(CommonUtilities.PROPERTY_REG_PASSWORD, password);
+        editor.putString(CommonUtilities.PROPERTY_REG_EMAIL, email);
+        editor.commit();
+    }
+
+    private String getUsername(Context context) {
+        final SharedPreferences prefs = getGcmPreferences(context);
+        String username = prefs.getString(CommonUtilities.PROPERTY_REG_USERNAME, "");
+        if (username.isEmpty()) {
+            Log.i(CommonUtilities.TAG, "username not found.");
+            return "";
+        }
+        // Check if app was updated; if so, it must clear the registration ID
+        // since the existing regID is not guaranteed to work with the new
+        // app version.
+        int registeredVersion = prefs.getInt(CommonUtilities.PROPERTY_APP_VERSION, Integer.MIN_VALUE);
+        int currentVersion = getAppVersion(context);
+        if (registeredVersion != currentVersion) {
+            Log.i(CommonUtilities.TAG, "App version changed.");
+            return "";
+        }
+        return username;
+    }
+
     /**
      * Registers the application with GCM servers asynchronously.
      * <p>
@@ -272,11 +315,9 @@ public class DemoActivity extends Activity {
 
                 @Override
                 protected void onPostExecute(String msg) {
-                    mDisplay.append(msg + "\n");
                 }
             }.execute(null, null, null);
         } else if (view == findViewById(R.id.clear)) {
-            mDisplay.setText("");
         }
     }
 
@@ -322,24 +363,24 @@ public class DemoActivity extends Activity {
         // It's also necessary to cancel the thread onDestroy(),
         // hence the use of AsyncTask instead of a raw thread.
         final Context context = this;
-        mRegisterTask = new AsyncTask<Void, Void, Void>() {
+        mRegisterTask = new AsyncTask<Void, Void, HttpResponse>() {
 
             @Override
-            protected Void doInBackground(Void... params) {
+            protected HttpResponse doInBackground(Void... params) {
                 // Register on our server
                 // On server creates a new user
                 // Read EditText dat
-                String name = txtName.getText().toString();
-                String email = txtEmail.getText().toString();
-                String password = txtPassword.getText().toString();
+                username = txtName.getText().toString();
+                email = txtEmail.getText().toString();
+                password = txtPassword.getText().toString();
 
                 // Check if user filled the form
-                if(name.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
+                if(username.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
                     // Register to server
                     HttpClient httpClient = new DefaultHttpClient();
                     HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL);
                     List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
-                    nameValuePair.add(new BasicNameValuePair("username", name));
+                    nameValuePair.add(new BasicNameValuePair("username", username));
                     nameValuePair.add(new BasicNameValuePair("password", password));
                     nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
                     nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
@@ -358,6 +399,7 @@ public class DemoActivity extends Activity {
                         HttpResponse response = httpClient.execute(httpPost);
                         // write response to log
                         Log.d("Http Post Response:", response.toString());
+                        return response;
                     } catch (ClientProtocolException e) {
                         // Log exception
                         e.printStackTrace();
@@ -365,15 +407,8 @@ public class DemoActivity extends Activity {
                         // Log exception
                         e.printStackTrace();
                     }
+                    return null;
 
-                    Intent i = new Intent(getApplicationContext(), MainActivity.class);
-
-                    // Registering user on our server
-                    // Sending registraiton details to MainActivity
-                    i.putExtra("name", name);
-                    i.putExtra("email", email);
-                    startActivity(i);
-                    finish();
                 }else{
                     // user doen't filled that data
                     // ask him to fill the form
@@ -382,8 +417,49 @@ public class DemoActivity extends Activity {
             }
 
             @Override
-            protected void onPostExecute(Void result) {
-                mRegisterTask = null;
+            protected void onPostExecute(HttpResponse result) {
+                String jsonBody = "";
+                boolean error = false;
+                String errorMessage = "";
+                String name = "";
+                String mail="";
+                try {
+                    jsonBody = EntityUtils.toString(result.getEntity());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                if (!jsonBody.isEmpty()) {
+                    try {
+                        JSONObject data = new JSONObject(jsonBody);
+                        error = data.getBoolean("error");
+                        errorMessage = data.getString("error_message");
+                        JSONObject user = data.getJSONObject("user");
+                        name = user.getString("name");
+                        mail = user.getString("email");
+
+                        Log.i(CommonUtilities.TAG, "JSONObject user= " + user + "name =" + name + "email = "+ mail);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                    if (!error) {
+                        storeCrefentials(context, name, "", mail);
+                        mRegisterTask = null;
+                        Intent i = new Intent(getApplicationContext(), MainActivity.class);
+
+                        // Registering user on our server
+                        // Sending registraiton details to MainActivity
+                        i.putExtra("name", name);
+                        i.putExtra("email", mail);
+                        startActivity(i);
+                        finish();
+                    } else {
+                        alert.showAlertDialog(DemoActivity.this,
+                                "An error has occurred",errorMessage, false);
+                    }
+                }
+
             }
 
         };

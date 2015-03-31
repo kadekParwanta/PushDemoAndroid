@@ -22,6 +22,9 @@ public final class CommonUtilities {
 
     public static final String EXTRA_MESSAGE = "message";
     public static final String PROPERTY_REG_ID = "registration_id";
+    public static final String PROPERTY_REG_USERNAME = "username";
+    public static final String PROPERTY_REG_PASSWORD = "password";
+    public static final String PROPERTY_REG_EMAIL = "email";
     public static final String PROPERTY_APP_VERSION = "appVersion";
     public static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
 
