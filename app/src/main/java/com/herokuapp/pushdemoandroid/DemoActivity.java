@@ -21,6 +21,7 @@ import com.google.android.gms.gcm.GoogleCloudMessaging;
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
+import com.herokuapp.pushdemoandroid.helper.DatabaseManager;
 import com.herokuapp.pushdemoandroid.helper.SessionManager;
 
 import android.app.Activity;
@@ -88,6 +89,7 @@ public class DemoActivity extends Activity {
     private String email;
     private SessionManager session;
     private ProgressDialog pDialog;
+    private DatabaseManager db;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -103,6 +105,9 @@ public class DemoActivity extends Activity {
 
         // Check if Internet present
         cd = new ConnectionDetector(getApplicationContext());
+        // SQLite database handler
+        db = new DatabaseManager(getApplicationContext());
+
         if (!cd.isConnectingToInternet()) {
             // Internet Connection is not present
             alert.showAlertDialog(DemoActivity.this,
@@ -457,6 +462,11 @@ public class DemoActivity extends Activity {
                         JSONObject user = data.getJSONObject("user");
                         name = user.getString("name");
                         mail = user.getString("email");
+                        String createdAt = user.getString("created_at");
+                        String uid = user.getString("uid");
+
+                        // Inserting row in users table
+                        db.addUser(name, mail, uid, createdAt);
 
                         Log.i(CommonUtilities.TAG, "JSONObject user= " + user + " name =" + name + "email = "+ mail);
                     } catch (JSONException e) {
