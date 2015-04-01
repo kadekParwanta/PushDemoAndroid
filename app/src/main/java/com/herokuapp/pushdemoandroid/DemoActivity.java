@@ -37,6 +37,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -148,7 +149,20 @@ public class DemoActivity extends Activity {
 
             @Override
             public void onClick(View arg0) {
-                sendPostRequest();
+                username = txtName.getText().toString();
+                email = txtEmail.getText().toString();
+                password = txtPassword.getText().toString();
+
+                // Check for empty data in the form
+                if (email.trim().length() > 0 && password.trim().length() > 0) {
+                    // login user
+                    sendPostRequest();
+                } else {
+                    // Prompt user to enter credentials
+                    Toast.makeText(getApplicationContext(),
+                            "Please enter the credentials!", Toast.LENGTH_LONG)
+                            .show();
+                }
             }
         });
 
@@ -386,51 +400,36 @@ public class DemoActivity extends Activity {
 
             @Override
             protected HttpResponse doInBackground(Void... params) {
-                // Register on our server
-                // On server creates a new user
-                // Read EditText dat
-                username = txtName.getText().toString();
-                email = txtEmail.getText().toString();
-                password = txtPassword.getText().toString();
+                // Register to server
+                HttpClient httpClient = new DefaultHttpClient();
+                HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL_REGISTER);
+                List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
+                nameValuePair.add(new BasicNameValuePair("username", username));
+                nameValuePair.add(new BasicNameValuePair("password", password));
+                nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
+                nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
+                nameValuePair.add(new BasicNameValuePair("mail", email));
 
-                // Check if user filled the form
-                if(username.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
-                    // Register to server
-                    HttpClient httpClient = new DefaultHttpClient();
-                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL_REGISTER);
-                    List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
-                    nameValuePair.add(new BasicNameValuePair("username", username));
-                    nameValuePair.add(new BasicNameValuePair("password", password));
-                    nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
-                    nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
-                    nameValuePair.add(new BasicNameValuePair("mail", email));
+                //Encoding POST data
+                try {
+                    httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
 
-                    //Encoding POST data
-                    try {
-                        httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
+                } catch (UnsupportedEncodingException e)
+                {
+                    e.printStackTrace();
+                }
 
-                    } catch (UnsupportedEncodingException e)
-                    {
-                        e.printStackTrace();
-                    }
-
-                    try {
-                        HttpResponse response = httpClient.execute(httpPost);
-                        // write response to log
-                        Log.d("Http Post Response:", response.toString());
-                        return response;
-                    } catch (ClientProtocolException e) {
-                        // Log exception
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        // Log exception
-                        e.printStackTrace();
-                    }
-                    return null;
-
-                }else{
-                    // user doen't filled that data
-                    // ask him to fill the form
+                try {
+                    HttpResponse response = httpClient.execute(httpPost);
+                    // write response to log
+                    Log.d("Http Post Response:", response.toString());
+                    return response;
+                } catch (ClientProtocolException e) {
+                    // Log exception
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    // Log exception
+                    e.printStackTrace();
                 }
                 return null;
             }
@@ -438,6 +437,7 @@ public class DemoActivity extends Activity {
             @Override
             protected void onPostExecute(HttpResponse result) {
                 hideDialog();
+                if (result == null) return;
                 String jsonBody = "";
                 boolean error = false;
                 String errorMessage = "";
