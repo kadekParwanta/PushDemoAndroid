@@ -57,6 +57,11 @@
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/app_name" >
         </activity>
+        <activity
+            android:name=".LoginActivity"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/app_name" >
+        </activity>
 
         <!--
           WakefulBroadcastReceiver that will receive intents from GCM

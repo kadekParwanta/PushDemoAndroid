@@ -21,8 +21,10 @@ import com.google.android.gms.gcm.GoogleCloudMessaging;
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
+import com.herokuapp.pushdemoandroid.helper.SessionManager;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -45,7 +47,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -79,10 +80,13 @@ public class DemoActivity extends Activity {
 
     // Register button
     Button btnRegister;
+    Button btnLinkToLoginScreen;
     AsyncTask<Void,Void,HttpResponse> mRegisterTask;
     private String username;
     private String password;
     private String email;
+    private SessionManager session;
+    private ProgressDialog pDialog;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -94,6 +98,7 @@ public class DemoActivity extends Activity {
         btnRegister = (Button) findViewById(R.id.btnRegister);
         txtPassword = (EditText) findViewById(R.id.txtPassword);
         mDisplay = (TextView) findViewById(R.id.tvDisplay);
+        btnLinkToLoginScreen = (Button) findViewById(R.id.btnLinkToLoginScreen);
 
         // Check if Internet present
         cd = new ConnectionDetector(getApplicationContext());
@@ -107,6 +112,9 @@ public class DemoActivity extends Activity {
         }
 
         context = getApplicationContext();
+        session = new SessionManager(getApplicationContext());
+        pDialog = new ProgressDialog(this);
+        pDialog.setCancelable(false);
 
         // Check device for Play Services APK. If check succeeds, proceed with GCM registration.
         if (checkPlayServices()) {
@@ -117,7 +125,7 @@ public class DemoActivity extends Activity {
 
             if (regid.isEmpty()) {
                 registerInBackground();
-            } else if (!username.isEmpty()) {
+            } else if (session.isLoggedIn()) {
                 Intent i = new Intent(getApplicationContext(), MainActivity.class);
 
                 // Registering user on our server
@@ -141,6 +149,18 @@ public class DemoActivity extends Activity {
             @Override
             public void onClick(View arg0) {
                 sendPostRequest();
+            }
+        });
+
+        /*
+		 * Click event on LinkToLogin button
+		 * */
+        btnLinkToLoginScreen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent i = new Intent(getApplicationContext(), LoginActivity.class);
+                startActivity(i);
+                finish();
             }
         });
     }
@@ -359,9 +379,8 @@ public class DemoActivity extends Activity {
     }
 
     private void sendPostRequest() {
-        // Try to register again, but not in the UI thread.
-        // It's also necessary to cancel the thread onDestroy(),
-        // hence the use of AsyncTask instead of a raw thread.
+        pDialog.setMessage("Registering ...");
+        showDialog();
         final Context context = this;
         mRegisterTask = new AsyncTask<Void, Void, HttpResponse>() {
 
@@ -378,7 +397,7 @@ public class DemoActivity extends Activity {
                 if(username.trim().length() > 0 && email.trim().length() > 0 && password.trim().length() > 0){
                     // Register to server
                     HttpClient httpClient = new DefaultHttpClient();
-                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL);
+                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL_REGISTER);
                     List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
                     nameValuePair.add(new BasicNameValuePair("username", username));
                     nameValuePair.add(new BasicNameValuePair("password", password));
@@ -418,6 +437,7 @@ public class DemoActivity extends Activity {
 
             @Override
             protected void onPostExecute(HttpResponse result) {
+                hideDialog();
                 String jsonBody = "";
                 boolean error = false;
                 String errorMessage = "";
@@ -433,12 +453,12 @@ public class DemoActivity extends Activity {
                     try {
                         JSONObject data = new JSONObject(jsonBody);
                         error = data.getBoolean("error");
-                        errorMessage = data.getString("error_message");
+                        if (error) errorMessage = data.getString("error_message");
                         JSONObject user = data.getJSONObject("user");
                         name = user.getString("name");
                         mail = user.getString("email");
 
-                        Log.i(CommonUtilities.TAG, "JSONObject user= " + user + "name =" + name + "email = "+ mail);
+                        Log.i(CommonUtilities.TAG, "JSONObject user= " + user + " name =" + name + "email = "+ mail);
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -464,5 +484,15 @@ public class DemoActivity extends Activity {
 
         };
         mRegisterTask.execute(null, null, null);
+    }
+
+    private void showDialog() {
+        if (!pDialog.isShowing())
+            pDialog.show();
+    }
+
+    private void hideDialog() {
+        if (pDialog.isShowing())
+            pDialog.dismiss();
     }
 }
