@@ -17,6 +17,7 @@ import android.widget.Toast;
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
 import com.herokuapp.pushdemoandroid.helper.DatabaseManager;
+import com.herokuapp.pushdemoandroid.helper.GPSTracker;
 import com.herokuapp.pushdemoandroid.helper.SessionManager;
 import com.herokuapp.pushdemoandroid.helper.WakeLocker;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
@@ -62,6 +63,7 @@ public class MainActivity extends Activity {
     private Button btnLogout;
     private DatabaseManager db;
     private SessionManager session;
+    GPSTracker gps;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -91,23 +93,34 @@ public class MainActivity extends Activity {
 
         // session manager
         session = new SessionManager(getApplicationContext());
+        gps = new GPSTracker(getApplicationContext());
+        final double latitude;
+        final double longitude;
+
+        // check if GPS enabled
+        if(gps.canGetLocation()){
+
+            latitude = gps.getLatitude();
+            longitude = gps.getLongitude();
+            CommonUtilities.storeLastPosition(getApplicationContext(), latitude, longitude);
+        }else{
+            // can't get location
+            // GPS or Network is not enabled
+            // Ask user to enable GPS/network in settings
+            gps.showSettingsAlert();
+            latitude =0;
+            longitude=0;
+        }
 
         if (!session.isLoggedIn()) {
             logoutUser();
         }
 
-        // Getting name, email from intent
-        Intent i = getIntent();
-
-        name = i.getStringExtra("name");
-        lblName.setText(name);
-        email = i.getStringExtra("email");
-        lblEmail.setText(email);
-
         // Fetching user details from sqlite
         HashMap<String, String> user = db.getUserDetails();
         name = user.get("name");
         email = user.get("email");
+        lblName.setText("Welcome " + name + "\n" + email);
 
 
         lblMessage = (TextView) findViewById(R.id.lblMessage);
@@ -118,7 +131,7 @@ public class MainActivity extends Activity {
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                sendPostRequest();
+                sendPostRequest(latitude, longitude);
             }
         });
         btnLogout.setOnClickListener(new View.OnClickListener() {
@@ -167,10 +180,14 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Log.e("UnRegister Receiver Error", "> " + e.getMessage());
         }
+
+        if (gps != null) {
+            gps.stopUsingGPS();
+        }
         super.onDestroy();
     }
 
-    private void sendPostRequest() {
+    private void sendPostRequest(final double latitude, final double longitude) {
         // Try to register again, but not in the UI thread.
         // It's also necessary to cancel the thread onDestroy(),
         // hence the use of AsyncTask instead of a raw thread.
@@ -181,6 +198,7 @@ public class MainActivity extends Activity {
             protected Void doInBackground(Void... params) {
                 String username = etSendTo.getText().toString();
                 String message = etMessage.getText().toString();
+                message = message + " latitude= " + String.valueOf(latitude) + " longitude= " + String.valueOf(longitude);
                 name = "kadek";
                 email = "k@k.k";
                 String password = name;

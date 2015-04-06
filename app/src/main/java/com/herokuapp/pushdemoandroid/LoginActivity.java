@@ -191,11 +191,6 @@ public class LoginActivity extends Activity {
                         mRegisterTask = null;
                         if (db.getRowCount() == 0) db.addUser(name, mail, uid, createdAt);
                         Intent i = new Intent(getApplicationContext(), MainActivity.class);
-
-                        // Registering user on our server
-                        // Sending registraiton details to MainActivity
-                        i.putExtra("name", name);
-                        i.putExtra("email", mail);
                         startActivity(i);
                         finish();
                     } else {

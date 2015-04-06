@@ -33,6 +33,7 @@
     <!-- This app has permission to register and receive data message. -->
     <uses-permission
         android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application android:allowBackup="true" android:label="@string/app_name"
         android:icon="@drawable/ic_launcher" android:theme="@style/AppTheme">

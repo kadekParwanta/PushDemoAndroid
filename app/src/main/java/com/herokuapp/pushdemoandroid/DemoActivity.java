@@ -125,19 +125,12 @@ public class DemoActivity extends Activity {
         // Check device for Play Services APK. If check succeeds, proceed with GCM registration.
         if (checkPlayServices()) {
             gcm = GoogleCloudMessaging.getInstance(this);
-            regid = getRegistrationId(context);
-            String username = getUsername(context);
-            Log.i(CommonUtilities.TAG,"regid = " + regid + " username= " + username);
+            regid = CommonUtilities.getRegistrationId(context);
 
             if (regid.isEmpty()) {
                 registerInBackground();
             } else if (session.isLoggedIn()) {
                 Intent i = new Intent(getApplicationContext(), MainActivity.class);
-
-                // Registering user on our server
-                // Sending registraiton details to MainActivity
-                i.putExtra("name", username);
-//                i.putExtra("email", email);
                 startActivity(i);
                 finish();
             }
@@ -211,81 +204,6 @@ public class DemoActivity extends Activity {
         return true;
     }
 
-    /**
-     * Stores the registration ID and the app versionCode in the application's
-     * {@code SharedPreferences}.
-     *
-     * @param context application's context.
-     * @param regId registration ID
-     */
-    private void storeRegistrationId(Context context, String regId) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        int appVersion = getAppVersion(context);
-        Log.i(CommonUtilities.TAG, "Saving regId on app version " + appVersion);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString(CommonUtilities.PROPERTY_REG_ID, regId);
-        editor.putInt(CommonUtilities.PROPERTY_APP_VERSION, appVersion);
-        editor.commit();
-    }
-
-    /**
-     * Gets the current registration ID for application on GCM service, if there is one.
-     * <p>
-     * If result is empty, the app needs to register.
-     *
-     * @return registration ID, or empty string if there is no existing
-     *         registration ID.
-     */
-    private String getRegistrationId(Context context) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        String registrationId = prefs.getString(CommonUtilities.PROPERTY_REG_ID, "");
-        if (registrationId.isEmpty()) {
-            Log.i(CommonUtilities.TAG, "Registration not found.");
-            return "";
-        }
-        // Check if app was updated; if so, it must clear the registration ID
-        // since the existing regID is not guaranteed to work with the new
-        // app version.
-        int registeredVersion = prefs.getInt(CommonUtilities.PROPERTY_APP_VERSION, Integer.MIN_VALUE);
-        int currentVersion = getAppVersion(context);
-        if (registeredVersion != currentVersion) {
-            Log.i(CommonUtilities.TAG, "App version changed.");
-            return "";
-        }
-        return registrationId;
-    }
-
-
-
-    private void storeCrefentials(Context context, String username, String password, String email) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        int appVersion = getAppVersion(context);
-        Log.i(CommonUtilities.TAG, "Saving regId on app version " + appVersion);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString(CommonUtilities.PROPERTY_REG_USERNAME, username);
-        editor.putString(CommonUtilities.PROPERTY_REG_PASSWORD, password);
-        editor.putString(CommonUtilities.PROPERTY_REG_EMAIL, email);
-        editor.commit();
-    }
-
-    private String getUsername(Context context) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        String username = prefs.getString(CommonUtilities.PROPERTY_REG_USERNAME, "");
-        if (username.isEmpty()) {
-            Log.i(CommonUtilities.TAG, "username not found.");
-            return "";
-        }
-        // Check if app was updated; if so, it must clear the registration ID
-        // since the existing regID is not guaranteed to work with the new
-        // app version.
-        int registeredVersion = prefs.getInt(CommonUtilities.PROPERTY_APP_VERSION, Integer.MIN_VALUE);
-        int currentVersion = getAppVersion(context);
-        if (registeredVersion != currentVersion) {
-            Log.i(CommonUtilities.TAG, "App version changed.");
-            return "";
-        }
-        return username;
-    }
 
     /**
      * Registers the application with GCM servers asynchronously.
@@ -314,7 +232,7 @@ public class DemoActivity extends Activity {
                     // 'from' address in the message.
 
                     // Persist the regID - no need to register again.
-                    storeRegistrationId(context, regid);
+                    CommonUtilities.storeRegistrationId(context, regid);
                 } catch (IOException ex) {
                     msg = "Error :" + ex.getMessage();
                     // If there is an error, don't just keep trying to register.
@@ -366,29 +284,6 @@ public class DemoActivity extends Activity {
     }
 
     /**
-     * @return Application's version code from the {@code PackageManager}.
-     */
-    private static int getAppVersion(Context context) {
-        try {
-            PackageInfo packageInfo = context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0);
-            return packageInfo.versionCode;
-        } catch (NameNotFoundException e) {
-            // should never happen
-            throw new RuntimeException("Could not get package name: " + e);
-        }
-    }
-
-    /**
-     * @return Application's {@code SharedPreferences}.
-     */
-    private SharedPreferences getGcmPreferences(Context context) {
-        // This sample app persists the registration ID in shared preferences, but
-        // how you store the regID in your app is up to you.
-        return getSharedPreferences(DemoActivity.class.getSimpleName(),
-                Context.MODE_PRIVATE);
-    }
-    /**
      * Sends the registration ID to your server over HTTP, so it can use GCM/HTTP or CCS to send
      * messages to your app. Not needed for this demo since the device sends upstream messages
      * to a server that echoes back the message using the 'from' address in the message.
@@ -409,11 +304,11 @@ public class DemoActivity extends Activity {
                 HttpClient httpClient = new DefaultHttpClient();
                 HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL_REGISTER);
                 List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
-                nameValuePair.add(new BasicNameValuePair("username", username));
-                nameValuePair.add(new BasicNameValuePair("password", password));
-                nameValuePair.add(new BasicNameValuePair("gcm_regid", regid));
-                nameValuePair.add(new BasicNameValuePair("role", "ROLE_USER"));
-                nameValuePair.add(new BasicNameValuePair("mail", email));
+                nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_USERNAME, username));
+                nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_PASSWORD, password));
+                nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_GCMID, regid));
+                nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_ROLE, "ROLE_USER"));
+                nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_EMAIL, email));
 
                 //Encoding POST data
                 try {
@@ -474,14 +369,8 @@ public class DemoActivity extends Activity {
                     }
 
                     if (!error) {
-                        storeCrefentials(context, name, "", mail);
                         mRegisterTask = null;
                         Intent i = new Intent(getApplicationContext(), MainActivity.class);
-
-                        // Registering user on our server
-                        // Sending registraiton details to MainActivity
-                        i.putExtra("name", name);
-                        i.putExtra("email", mail);
                         startActivity(i);
                         finish();
                     } else {
