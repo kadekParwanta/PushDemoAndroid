@@ -30,6 +30,8 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -102,7 +104,7 @@ public class MainActivity extends Activity {
 
             latitude = gps.getLatitude();
             longitude = gps.getLongitude();
-            CommonUtilities.storeLastPosition(getApplicationContext(), latitude, longitude);
+            CommonUtilities.storeLastPosition(getApplicationContext(), "Ryuzaki", latitude, longitude);
         }else{
             // can't get location
             // GPS or Network is not enabled
@@ -163,6 +165,18 @@ public class MainActivity extends Activity {
             lblMessage.append(newMessage + "\n");
             Toast.makeText(getApplicationContext(), "New Message: " + newMessage, Toast.LENGTH_LONG).show();
 
+            try {
+                JSONObject data = new JSONObject(newMessage);
+                String username = data.getString("username");
+                double latitude = data.getDouble("latitude");
+                double longitude = data.getDouble("longitude");
+
+                CommonUtilities.storeLastPosition(getApplicationContext(), username,
+                        latitude,longitude);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
             // Releasing wake lock
             WakeLocker.release();
         }
@@ -198,7 +212,16 @@ public class MainActivity extends Activity {
             protected Void doInBackground(Void... params) {
                 String username = etSendTo.getText().toString();
                 String message = etMessage.getText().toString();
-                message = message + " latitude= " + String.valueOf(latitude) + " longitude= " + String.valueOf(longitude);
+                JSONObject data = new JSONObject();
+                try {
+                    data.put("message", message);
+                    data.put("username", username);
+                    data.put("latitude", latitude);
+                    data.put("longitude", longitude);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
                 name = "kadek";
                 email = "k@k.k";
                 String password = name;
@@ -211,7 +234,7 @@ public class MainActivity extends Activity {
                     List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
                     nameValuePair.add(new BasicNameValuePair("username", username));
                     nameValuePair.add(new BasicNameValuePair("password", password));
-                    nameValuePair.add(new BasicNameValuePair("message", message));
+                    nameValuePair.add(new BasicNameValuePair("message", data.toString()));
                     nameValuePair.add(new BasicNameValuePair("current_user", name));
 
                     //Encoding POST data
@@ -247,6 +270,8 @@ public class MainActivity extends Activity {
             @Override
             protected void onPostExecute(Void result) {
                 mRegisterTask = null;
+                Intent i = new Intent(MainActivity.this, MapActivity.class);
+                startActivity(i);
             }
 
         };

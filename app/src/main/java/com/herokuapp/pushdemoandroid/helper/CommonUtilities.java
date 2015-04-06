@@ -55,7 +55,7 @@ public final class CommonUtilities {
         context.sendBroadcast(intent);
     }
 
-    public static void storeLastPosition(Context context, double latitude, double longitude) {
+    public static void storeLastPosition(Context context, String username, double latitude, double longitude) {
         final SharedPreferences prefs = getGcmPreferences(context);
         int appVersion = getAppVersion(context);
         Log.i(CommonUtilities.TAG, "Saving last position on app version " + appVersion);
@@ -63,6 +63,7 @@ public final class CommonUtilities {
 
         JSONObject jsonObject = new JSONObject();
         try {
+            jsonObject.put("username", username);
             jsonObject.put("latitude", latitude);
             jsonObject.put("longitude", longitude);
         } catch (JSONException e) {
@@ -71,6 +72,23 @@ public final class CommonUtilities {
 
         editor.putString("lastPost", jsonObject.toString());
         editor.commit();
+    }
+
+    public static JSONObject getLasPostJSON(Context context) {
+        final SharedPreferences prefs = getGcmPreferences(context);
+        String lastPost = prefs.getString("lastPost", "");
+        if (lastPost.isEmpty()) {
+            Log.i(CommonUtilities.TAG, "lastPost not found.");
+            return null;
+        }
+
+        JSONObject lastPos = null;
+        try {
+            lastPos = new JSONObject(lastPost);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return lastPos;
     }
 
     public static String getUsername(Context context) {
