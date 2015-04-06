@@ -55,7 +55,7 @@ public final class CommonUtilities {
         context.sendBroadcast(intent);
     }
 
-    public static void storeLastPosition(Context context, String username, double latitude, double longitude) {
+    public static void storeLastPosition(Context context, String username, String current_user, double latitude, double longitude) {
         final SharedPreferences prefs = getGcmPreferences(context);
         int appVersion = getAppVersion(context);
         Log.i(CommonUtilities.TAG, "Saving last position on app version " + appVersion);
@@ -66,6 +66,7 @@ public final class CommonUtilities {
             jsonObject.put("username", username);
             jsonObject.put("latitude", latitude);
             jsonObject.put("longitude", longitude);
+            jsonObject.put("current_user", current_user);
         } catch (JSONException e) {
 
         }

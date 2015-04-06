@@ -116,7 +116,6 @@ public class MainActivity extends Activity {
 
             latitude = gps.getLatitude();
             longitude = gps.getLongitude();
-            CommonUtilities.storeLastPosition(getApplicationContext(), "Ryuzaki", latitude, longitude);
         }else{
             // can't get location
             // GPS or Network is not enabled
@@ -136,6 +135,7 @@ public class MainActivity extends Activity {
         email = user.get("email");
         lblName.setText("Welcome " + name + "\n" + email);
 
+        CommonUtilities.storeLastPosition(getApplicationContext(), "Ryuzaki", name, latitude, longitude);
 
         lblMessage = (TextView) findViewById(R.id.lblMessage);
 
@@ -145,7 +145,7 @@ public class MainActivity extends Activity {
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                sendPostRequest(latitude, longitude);
+                sendPostRequest(latitude, longitude, true, name);
             }
         });
         btnLogout.setOnClickListener(new View.OnClickListener() {
@@ -191,10 +191,16 @@ public class MainActivity extends Activity {
                 String username = data.getString("username");
                 double latitude = data.getDouble("latitude");
                 double longitude = data.getDouble("longitude");
+                String message = data.getString("message");
+                String current_user = data.getString("current_user");
 
-                CommonUtilities.storeLastPosition(getApplicationContext(), username,
-                        latitude,longitude);
-                updateMap();
+                if (message.equalsIgnoreCase("request")) {
+                    sendPostRequest(gps.getLatitude(), gps.getLongitude(), false, current_user);
+                } else {
+                    CommonUtilities.storeLastPosition(getApplicationContext(), username, current_user,
+                            latitude,longitude);
+                    updateMap();
+                }
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -223,7 +229,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    private void sendPostRequest(final double latitude, final double longitude) {
+    private void sendPostRequest(final double latitude, final double longitude, final boolean isRequest, final String destUser) {
         // Try to register again, but not in the UI thread.
         // It's also necessary to cancel the thread onDestroy(),
         // hence the use of AsyncTask instead of a raw thread.
@@ -236,18 +242,25 @@ public class MainActivity extends Activity {
             protected Void doInBackground(Void... params) {
                 String username = etSendTo.getText().toString();
                 String message = etMessage.getText().toString();
+
                 JSONObject data = new JSONObject();
                 try {
-                    data.put("message", message);
                     data.put("username", username);
+                    data.put("current_user", name);
                     data.put("latitude", latitude);
                     data.put("longitude", longitude);
+                    if (isRequest) {
+                        data.put("message", "request");
+                    } else {
+                        data.put("message", message);
+                    }
+
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
 
-                name = "kadek";
-                email = "k@k.k";
+//                name = "kadek";
+//                email = "k@k.k";
                 String password = name;
 
                 // Check if user filled the form
@@ -256,6 +269,7 @@ public class MainActivity extends Activity {
                     HttpClient httpClient = new DefaultHttpClient();
                     HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_PUSH_URL);
                     List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
+                    if (!isRequest) username = destUser;
                     nameValuePair.add(new BasicNameValuePair("username", username));
                     nameValuePair.add(new BasicNameValuePair("password", password));
                     nameValuePair.add(new BasicNameValuePair("message", data.toString()));
@@ -342,7 +356,8 @@ public class MainActivity extends Activity {
             String username = laspos.getString("username");
             double latitude = laspos.getDouble("latitude");
             double longitude = laspos.getDouble("longitude");
-            MarkerOptions marker = new MarkerOptions().position(new LatLng(latitude, longitude)).title(username);
+            String current_user = laspos.getString("current_user");
+            MarkerOptions marker = new MarkerOptions().position(new LatLng(latitude, longitude)).title(current_user);
             googleMap.addMarker(marker);
 
             CameraPosition cameraPosition = new CameraPosition.Builder().target(
