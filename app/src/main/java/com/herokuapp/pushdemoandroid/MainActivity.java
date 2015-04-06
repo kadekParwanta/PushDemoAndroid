@@ -16,6 +16,8 @@ import android.widget.Toast;
 
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
+import com.herokuapp.pushdemoandroid.helper.DatabaseManager;
+import com.herokuapp.pushdemoandroid.helper.SessionManager;
 import com.herokuapp.pushdemoandroid.helper.WakeLocker;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
 
@@ -31,10 +33,11 @@ import org.apache.http.message.BasicNameValuePair;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
- * Created by kadek on 3/29/2015.
+ * Created by Kadek_P on 3/29/2015.
  */
 public class MainActivity extends Activity {
     // label to display gcm messages
@@ -56,6 +59,9 @@ public class MainActivity extends Activity {
     private EditText etMessage;
     private EditText etSendTo;
     private Button btnSend;
+    private Button btnLogout;
+    private DatabaseManager db;
+    private SessionManager session;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -66,6 +72,7 @@ public class MainActivity extends Activity {
         etMessage = (EditText) findViewById(R.id.etMessage);
         etSendTo = (EditText) findViewById(R.id.etSendTo);
         btnSend = (Button) findViewById(R.id.btnSend);
+        btnLogout = (Button) findViewById(R.id.btnLogout);
 
         cd = new ConnectionDetector(getApplicationContext());
 
@@ -79,6 +86,16 @@ public class MainActivity extends Activity {
             return;
         }
 
+        // SqLite database handler
+        db = new DatabaseManager(getApplicationContext());
+
+        // session manager
+        session = new SessionManager(getApplicationContext());
+
+        if (!session.isLoggedIn()) {
+            logoutUser();
+        }
+
         // Getting name, email from intent
         Intent i = getIntent();
 
@@ -86,6 +103,11 @@ public class MainActivity extends Activity {
         lblName.setText(name);
         email = i.getStringExtra("email");
         lblEmail.setText(email);
+
+        // Fetching user details from sqlite
+        HashMap<String, String> user = db.getUserDetails();
+        name = user.get("name");
+        email = user.get("email");
 
 
         lblMessage = (TextView) findViewById(R.id.lblMessage);
@@ -97,6 +119,13 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View view) {
                 sendPostRequest();
+            }
+        });
+        btnLogout.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                logoutUser();
             }
         });
     }
@@ -204,5 +233,20 @@ public class MainActivity extends Activity {
 
         };
         mRegisterTask.execute(null, null, null);
+    }
+
+    /**
+     * Logging out the user. Will set isLoggedIn flag to false in shared
+     * preferences Clears the user data from sqlite users table
+     * */
+    private void logoutUser() {
+        session.setLogin(false);
+
+        db.deleteUsers();
+
+        // Launching the login activity
+        Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+        startActivity(intent);
+        finish();
     }
 }

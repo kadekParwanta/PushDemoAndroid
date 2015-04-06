@@ -10,7 +10,7 @@ import android.util.Log;
 import java.util.HashMap;
 
 /**
- * Created by kadek on 4/1/2015.
+ * Created by Kadek_P on 4/1/2015.
  */
 public class DatabaseManager extends SQLiteOpenHelper {
 

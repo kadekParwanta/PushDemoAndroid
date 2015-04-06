@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
+import com.herokuapp.pushdemoandroid.helper.DatabaseManager;
 import com.herokuapp.pushdemoandroid.helper.SessionManager;
 
 import org.apache.http.HttpResponse;
@@ -34,7 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by mitrais on 4/1/15.
+ * Created by Kadek_P on 4/1/15.
  */
 public class LoginActivity extends Activity {
     private static final String TAG = DemoActivity.class.getSimpleName();
@@ -44,6 +45,7 @@ public class LoginActivity extends Activity {
     private EditText inputPassword;
     private ProgressDialog pDialog;
     private SessionManager session;
+    private DatabaseManager db;
     AsyncTask<Void,Void,HttpResponse> mRegisterTask;
     // alert dialog manager
     AlertDialogManager alert = new AlertDialogManager();
@@ -64,6 +66,7 @@ public class LoginActivity extends Activity {
 
         // Session manager
         session = new SessionManager(getApplicationContext());
+        db = new DatabaseManager(getApplicationContext());
 
         // Check if user is already logged in or not
         if (session.isLoggedIn()) {
@@ -159,6 +162,8 @@ public class LoginActivity extends Activity {
                 String errorMessage = "";
                 String name = "";
                 String mail="";
+                String createdAt = "";
+                String uid = "";
                 try {
                     jsonBody = EntityUtils.toString(result.getEntity());
                 } catch (IOException e) {
@@ -173,6 +178,8 @@ public class LoginActivity extends Activity {
                         JSONObject user = data.getJSONObject("user");
                         name = user.getString("name");
                         mail = user.getString("email");
+                        createdAt = user.getString("created_at");
+                        uid = user.getString("uid");
 
                         Log.i(CommonUtilities.TAG, "JSONObject user= " + user + " name =" + name + "email = "+ mail);
                     } catch (JSONException e) {
@@ -182,6 +189,7 @@ public class LoginActivity extends Activity {
                     if (!error) {
                         session.setLogin(true);
                         mRegisterTask = null;
+                        if (db.getRowCount() == 0) db.addUser(name, mail, uid, createdAt);
                         Intent i = new Intent(getApplicationContext(), MainActivity.class);
 
                         // Registering user on our server
