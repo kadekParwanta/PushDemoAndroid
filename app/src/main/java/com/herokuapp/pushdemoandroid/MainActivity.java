@@ -1,6 +1,7 @@
 package com.herokuapp.pushdemoandroid;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,6 +15,12 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
 import com.herokuapp.pushdemoandroid.helper.DatabaseManager;
@@ -66,6 +73,8 @@ public class MainActivity extends Activity {
     private DatabaseManager db;
     private SessionManager session;
     GPSTracker gps;
+    private GoogleMap googleMap;
+    private ProgressDialog pDialog;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -96,6 +105,9 @@ public class MainActivity extends Activity {
         // session manager
         session = new SessionManager(getApplicationContext());
         gps = new GPSTracker(getApplicationContext());
+        pDialog = new ProgressDialog(this);
+        pDialog.setCancelable(false);
+
         final double latitude;
         final double longitude;
 
@@ -143,6 +155,15 @@ public class MainActivity extends Activity {
                 logoutUser();
             }
         });
+
+        try {
+            // Loading map
+            initilizeMap();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        etSendTo.setText(name);
     }
 
     /**
@@ -173,6 +194,7 @@ public class MainActivity extends Activity {
 
                 CommonUtilities.storeLastPosition(getApplicationContext(), username,
                         latitude,longitude);
+                updateMap();
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -206,6 +228,8 @@ public class MainActivity extends Activity {
         // It's also necessary to cancel the thread onDestroy(),
         // hence the use of AsyncTask instead of a raw thread.
         final Context context = this;
+        pDialog.setMessage("Please wait ...");
+        showDialog();
         mRegisterTask = new AsyncTask<Void, Void, Void>() {
 
             @Override
@@ -270,8 +294,10 @@ public class MainActivity extends Activity {
             @Override
             protected void onPostExecute(Void result) {
                 mRegisterTask = null;
-                Intent i = new Intent(MainActivity.this, MapActivity.class);
-                startActivity(i);
+//                Intent i = new Intent(MainActivity.this, MapActivity.class);
+//                startActivity(i);
+//                updateMap();
+                hideDialog();
             }
 
         };
@@ -291,5 +317,50 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(MainActivity.this, LoginActivity.class);
         startActivity(intent);
         finish();
+    }
+
+    /**
+     * function to load map. If map is not created it will create it for you
+     * */
+    private void initilizeMap() {
+        if (googleMap == null) {
+            googleMap = ((MapFragment) getFragmentManager().findFragmentById(
+                    R.id.map)).getMap();
+
+            // check if map is created successfully or not
+            if (googleMap == null) {
+                Toast.makeText(getApplicationContext(),
+                        "Sorry! unable to create maps", Toast.LENGTH_SHORT)
+                        .show();
+            }
+        }
+    }
+
+    private void updateMap() {
+        JSONObject laspos = CommonUtilities.getLasPostJSON(getApplicationContext());
+        try {
+            String username = laspos.getString("username");
+            double latitude = laspos.getDouble("latitude");
+            double longitude = laspos.getDouble("longitude");
+            MarkerOptions marker = new MarkerOptions().position(new LatLng(latitude, longitude)).title(username);
+            googleMap.addMarker(marker);
+
+            CameraPosition cameraPosition = new CameraPosition.Builder().target(
+                    new LatLng(latitude, longitude)).zoom(12).build();
+
+            googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showDialog() {
+        if (!pDialog.isShowing())
+            pDialog.show();
+    }
+
+    private void hideDialog() {
+        if (pDialog.isShowing())
+            pDialog.dismiss();
     }
 }
