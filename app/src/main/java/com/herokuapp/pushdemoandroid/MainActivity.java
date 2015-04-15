@@ -1,14 +1,17 @@
 package com.herokuapp.pushdemoandroid;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -16,6 +19,8 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -81,6 +86,7 @@ public class MainActivity extends Activity {
     GPSTracker gps;
     private GoogleMap googleMap;
     private ProgressDialog pDialog;
+    private AdView mAdView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -126,7 +132,7 @@ public class MainActivity extends Activity {
             // can't get location
             // GPS or Network is not enabled
             // Ask user to enable GPS/network in settings
-            gps.showSettingsAlert();
+            showSettingsAlert();
             latitude =0;
             longitude=0;
             return;
@@ -171,6 +177,20 @@ public class MainActivity extends Activity {
         }
 
         etSendTo.setText(name);
+
+        // Gets the ad view defined in layout/ad_fragment.xml with ad unit ID set in
+        // values/strings.xml.
+        mAdView = (AdView) findViewById(R.id.ad_view);
+
+        // Create an ad request. Check logcat output for the hashed device ID to
+        // get test ads on a physical device. e.g.
+        // "Use AdRequest.Builder.addTestDevice("ABCDEF012345") to get test ads on this device."
+        AdRequest adRequest = new AdRequest.Builder()
+                .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
+                .build();
+
+        // Start loading the ad in the background.
+        mAdView.loadAd(adRequest);
     }
 
     /**
@@ -233,7 +253,29 @@ public class MainActivity extends Activity {
         if (gps != null) {
             gps.stopUsingGPS();
         }
+
+        if (mAdView != null) {
+            mAdView.destroy();
+        }
         super.onDestroy();
+    }
+
+    /** Called when leaving the activity */
+    @Override
+    public void onPause() {
+        if (mAdView != null) {
+            mAdView.pause();
+        }
+        super.onPause();
+    }
+
+    /** Called when returning to the activity */
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (mAdView != null) {
+            mAdView.resume();
+        }
     }
 
     private void sendPostRequest(final double latitude, final double longitude, final boolean isRequest, final String destUser) {
@@ -373,6 +415,7 @@ public class MainActivity extends Activity {
             googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 
             String url = makeURL(gps.getLatitude(), gps.getLongitude(), latitude, longitude);
+            Log.d("MainActivity","updateMap url = " + url);
             connectGmapDirectionsAsyncTask task = new connectGmapDirectionsAsyncTask(url);
             task.execute(null,null,null);
 
@@ -410,7 +453,7 @@ public class MainActivity extends Activity {
     }
 
     public void drawPath(String  result) {
-
+        Log.d("MainActivity","drawPath result = " + result);
         try {
             //Tranform the string into a json object
             final JSONObject json = new JSONObject(result);
@@ -423,8 +466,8 @@ public class MainActivity extends Activity {
             for(int z = 0; z<list.size()-1;z++){
                 LatLng src= list.get(z);
                 LatLng dest= list.get(z+1);
-                Polyline line = googleMap.addPolyline(new PolylineOptions()
-                        .add(new LatLng(src.latitude, src.longitude), new LatLng(dest.latitude,   dest.longitude))
+                googleMap.addPolyline(new PolylineOptions()
+                        .add(new LatLng(src.latitude, src.longitude), new LatLng(dest.latitude, dest.longitude))
                         .width(2)
                         .color(Color.BLUE).geodesic(true));
             }
@@ -497,5 +540,39 @@ public class MainActivity extends Activity {
                 drawPath(result);
             }
         }
+    }
+
+    /**
+     * Function to show settings alert dialog
+     * */
+    public void showSettingsAlert(){
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(this);
+
+        // Setting Dialog Title
+        alertDialog.setTitle("GPS is settings");
+
+        // Setting Dialog Message
+        alertDialog.setMessage("GPS is not enabled. Do you want to go to settings menu?");
+
+        // Setting Icon to Dialog
+        //alertDialog.setIcon(R.drawable.delete);
+
+        // On pressing Settings button
+        alertDialog.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog,int which) {
+                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                startActivity(intent);
+            }
+        });
+
+        // on pressing cancel button
+        alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        // Showing Alert Message
+        alertDialog.show();
     }
 }
