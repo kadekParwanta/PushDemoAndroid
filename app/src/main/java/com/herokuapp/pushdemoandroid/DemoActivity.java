@@ -18,6 +18,9 @@ package com.herokuapp.pushdemoandroid;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.herokuapp.pushdemoandroid.helper.AlertDialogManager;
 import com.herokuapp.pushdemoandroid.helper.ConnectionDetector;
 import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
@@ -42,18 +45,23 @@ import android.widget.Toast;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -83,13 +91,17 @@ public class DemoActivity extends Activity {
     // Register button
     Button btnRegister;
     Button btnLinkToLoginScreen;
-    AsyncTask<Void,Void,HttpResponse> mRegisterTask;
+    AsyncTask<Void,Void,JsonObject> mRegisterTask;
     private String username;
     private String password;
     private String email;
     private SessionManager session;
     private ProgressDialog pDialog;
     private DatabaseManager db;
+
+    private final static int READ_TIMEOUT = 10000;
+    private final static int CONN_TIMEOUT = 15000;
+    private String POST = "POST";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -296,13 +308,11 @@ public class DemoActivity extends Activity {
         pDialog.setMessage("Registering ...");
         showDialog();
         final Context context = this;
-        mRegisterTask = new AsyncTask<Void, Void, HttpResponse>() {
+        mRegisterTask = new AsyncTask<Void, Void, JsonObject>() {
 
             @Override
-            protected HttpResponse doInBackground(Void... params) {
+            protected JsonObject doInBackground(Void... params) {
                 // Register to server
-                HttpClient httpClient = new DefaultHttpClient();
-                HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_URL_REGISTER);
                 List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
                 nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_USERNAME, username));
                 nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_PASSWORD, password));
@@ -310,32 +320,43 @@ public class DemoActivity extends Activity {
                 nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_ROLE, "ROLE_USER"));
                 nameValuePair.add(new BasicNameValuePair(CommonUtilities.PROPERTY_REG_EMAIL, email));
 
-                //Encoding POST data
                 try {
-                    httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
+                    URL url = new URL(CommonUtilities.SERVER_URL_REGISTER);
 
-                } catch (UnsupportedEncodingException e)
-                {
-                    e.printStackTrace();
-                }
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setReadTimeout(READ_TIMEOUT);
+                    conn.setConnectTimeout(CONN_TIMEOUT);
+                    conn.setRequestMethod(POST);
+                    conn.setDoInput(true);
+                    conn.setDoOutput(true);
 
-                try {
-                    HttpResponse response = httpClient.execute(httpPost);
-                    // write response to log
-                    Log.d("Http Post Response:", response.toString());
-                    return response;
-                } catch (ClientProtocolException e) {
-                    // Log exception
-                    e.printStackTrace();
+                    OutputStream os = conn.getOutputStream();
+                    BufferedWriter writer = new BufferedWriter(
+                            new OutputStreamWriter(os, "UTF-8"));
+                    writer.write(getQuery(nameValuePair));
+                    writer.flush();
+                    writer.close();
+                    os.close();
+
+                    conn.connect();
+
+                    JsonParser jp = new JsonParser();
+                    JsonElement root = jp.parse(new InputStreamReader((InputStream) conn.getContent()));
+                    JsonObject rootobj = root.getAsJsonObject();
+                    return rootobj;
+
+                } catch (MalformedURLException e) {
+//                        setErrorResponse("Malformed URL");
+                } catch (SocketTimeoutException e) {
+//                        setErrorResponse("Could not connect: Timeout");
                 } catch (IOException e) {
-                    // Log exception
-                    e.printStackTrace();
+//                        setErrorResponse("Could not connect");
                 }
                 return null;
             }
 
             @Override
-            protected void onPostExecute(HttpResponse result) {
+            protected void onPostExecute(JsonObject result) {
                 hideDialog();
                 if (result == null) return;
                 String jsonBody = "";
@@ -343,11 +364,7 @@ public class DemoActivity extends Activity {
                 String errorMessage = "";
                 String name = "";
                 String mail="";
-                try {
-                    jsonBody = EntityUtils.toString(result.getEntity());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                jsonBody = result.getAsString();
 
                 if (!jsonBody.isEmpty()) {
                     try {
@@ -370,7 +387,7 @@ public class DemoActivity extends Activity {
 
                     if (!error) {
                         mRegisterTask = null;
-                        Intent i = new Intent(getApplicationContext(), MainActivity.class);
+                        Intent i = new Intent(getApplicationContext(), HomeActivity.class);
                         startActivity(i);
                         finish();
                     } else {
@@ -393,5 +410,23 @@ public class DemoActivity extends Activity {
     private void hideDialog() {
         if (pDialog.isShowing())
             pDialog.dismiss();
+    }
+
+    private String getQuery(List<NameValuePair> params) throws UnsupportedEncodingException {
+        StringBuilder result = new StringBuilder();
+        boolean first = true;
+
+        for (NameValuePair pair : params) {
+            if (first)
+                first = false;
+            else
+                result.append("&");
+
+            result.append(URLEncoder.encode(pair.getName(), "UTF-8"));
+            result.append("=");
+            result.append(URLEncoder.encode(pair.getValue(), "UTF-8"));
+        }
+
+        return result.toString();
     }
 }

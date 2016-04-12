@@ -15,9 +15,9 @@ import org.json.JSONObject;
 public final class CommonUtilities {
 	
 	// give your server registration url here
-    public static final String SERVER_URL_REGISTER = "http://pushdemo.herokuapp.com/register?";
-    public static final String SERVER_PUSH_URL = "http://pushdemo.herokuapp.com/push_to_user?";
-    public static final String SERVER_URL_LOGIN = "http://pushdemo.herokuapp.com/client_login?";
+    public static final String SERVER_URL_REGISTER = "https://pushdemo.herokuapp.com/register?";
+    public static final String SERVER_PUSH_URL = "https://pushdemo.herokuapp.com/push_to_user?";
+    public static final String SERVER_URL_LOGIN = "https://pushdemo.herokuapp.com/client_login?";
 
     // Google project id
     public static final String SENDER_ID = "388507868439";

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Push Demo Android</string>
+    <string name="app_name">Kongko</string>
     <string name="send">Send</string>
     <string name="clear">Clear</string>
     <string name="hint_email">Email</string>
@@ -15,4 +15,15 @@
     <string name="name">Fullname</string>
     <!-- This is an ad unit ID for a test ad. Replace with your own banner ad unit id. -->
     <string name="banner_ad_unit_id">ca-app-pub-3940256099942544/6300978111</string>
+
+    <string name="one">ONE</string>
+    <string name="eight">EIGHT</string>
+    <string name="five">FIVE</string>
+    <string name="four">FOUR</string>
+    <string name="nine">NINE</string>
+    <string name="seven">SEVEN</string>
+    <string name="six">SIX</string>
+    <string name="ten">TEN</string>
+    <string name="three">THREE</string>
+    <string name="two">TWO</string>
 </resources>

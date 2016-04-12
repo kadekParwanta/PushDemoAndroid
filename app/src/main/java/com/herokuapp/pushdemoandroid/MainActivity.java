@@ -41,18 +41,21 @@ import com.herokuapp.pushdemoandroid.helper.CommonUtilities;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -87,6 +90,10 @@ public class MainActivity extends Activity {
     private GoogleMap googleMap;
     private ProgressDialog pDialog;
     private AdView mAdView;
+
+    private final static int READ_TIMEOUT = 10000;
+    private final static int CONN_TIMEOUT = 15000;
+    private String POST = "POST";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -171,7 +178,7 @@ public class MainActivity extends Activity {
 
         try {
             // Loading map
-            initilizeMap();
+//            initilizeMap();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -285,12 +292,13 @@ public class MainActivity extends Activity {
         final Context context = this;
         pDialog.setMessage("Please wait ...");
         showDialog();
+        final String username = etSendTo.getText().toString();
+        final String message = etMessage.getText().toString();
         mRegisterTask = new AsyncTask<Void, Void, Void>() {
 
             @Override
             protected Void doInBackground(Void... params) {
-                String username = etSendTo.getText().toString();
-                String message = etMessage.getText().toString();
+
 
                 JSONObject data = new JSONObject();
                 try {
@@ -315,36 +323,43 @@ public class MainActivity extends Activity {
                 // Check if user filled the form
                 if(name.trim().length() > 0 && username.trim().length() > 0){
                     // Register to server
-                    HttpClient httpClient = new DefaultHttpClient();
-                    HttpPost httpPost = new HttpPost(CommonUtilities.SERVER_PUSH_URL);
+
                     List<NameValuePair> nameValuePair = new ArrayList<NameValuePair>(2);
-                    if (!isRequest) username = destUser;
-                    nameValuePair.add(new BasicNameValuePair("username", username));
+                    String userName = username;
+                    if (!isRequest) userName = destUser;
+                    nameValuePair.add(new BasicNameValuePair("username", userName));
                     nameValuePair.add(new BasicNameValuePair("password", password));
                     nameValuePair.add(new BasicNameValuePair("message", data.toString()));
                     nameValuePair.add(new BasicNameValuePair("current_user", name));
 
                     //Encoding POST data
                     try {
-                        httpPost.setEntity(new UrlEncodedFormEntity(nameValuePair));
+                        URL url = new URL(CommonUtilities.SERVER_PUSH_URL);
 
-                    } catch (UnsupportedEncodingException e)
-                    {
-                        e.printStackTrace();
-                    }
 
-                    try {
-                        HttpResponse response = httpClient.execute(httpPost);
-                        // write response to log
-                        Log.d("Http Post Response:", response.toString());
-                    } catch (ClientProtocolException e) {
-                        // Log exception
-                        e.printStackTrace();
-                        return null;
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setReadTimeout(READ_TIMEOUT);
+                        conn.setConnectTimeout(CONN_TIMEOUT);
+                        conn.setRequestMethod(POST);
+                        conn.setDoInput(true);
+                        conn.setDoOutput(true);
+
+                        OutputStream os = conn.getOutputStream();
+                        BufferedWriter writer = new BufferedWriter(
+                                new OutputStreamWriter(os, "UTF-8"));
+                        writer.write(getQuery(nameValuePair));
+                        writer.flush();
+                        writer.close();
+                        os.close();
+
+                        conn.connect();
+
+                    } catch (MalformedURLException e) {
+//                        setErrorResponse("Malformed URL");
+                    } catch (SocketTimeoutException e) {
+//                        setErrorResponse("Could not connect: Timeout");
                     } catch (IOException e) {
-                        // Log exception
-                        e.printStackTrace();
-                        return null;
+//                        setErrorResponse("Could not connect");
                     }
 
                 }else{
@@ -574,5 +589,23 @@ public class MainActivity extends Activity {
 
         // Showing Alert Message
         alertDialog.show();
+    }
+
+    private String getQuery(List<NameValuePair> params) throws UnsupportedEncodingException {
+        StringBuilder result = new StringBuilder();
+        boolean first = true;
+
+        for (NameValuePair pair : params) {
+            if (first)
+                first = false;
+            else
+                result.append("&");
+
+            result.append(URLEncoder.encode(pair.getName(), "UTF-8"));
+            result.append("=");
+            result.append(URLEncoder.encode(pair.getValue(), "UTF-8"));
+        }
+
+        return result.toString();
     }
 }
